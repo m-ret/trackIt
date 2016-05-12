@@ -8,3 +8,5 @@ Run in different terminal tabs from the route directory:
 - $ mongod
 - $ node server
 - $ gulp
+
+[localhost:3000](http://localhost:3000/)
