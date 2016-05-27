@@ -82,7 +82,7 @@ userSchema.methods.comparePassword = function(candidatePassword, cb) {
 var User = mongoose.model('User', userSchema);
 var Show = mongoose.model('Show', showSchema);
 
-mongoose.connect('localhost');
+mongoose.connect('localhost'); // LOCAL ENV
 
 var app = express();
 
@@ -143,7 +143,7 @@ app.post('/auth/login', function(req, res, next) {
   });
 });
 
-app.post('/auth/facebook', function(req, res, next) {  
+app.post('/auth/facebook', function(req, res, next) {
   var profile = req.body.profile;
   var signedRequest = req.body.signedRequest;
   var encodedSignature = signedRequest.split('.')[0];
@@ -152,7 +152,7 @@ app.post('/auth/facebook', function(req, res, next) {
   var appSecret = '298fb6c080fda239b809ae418bf49700';
 
   var expectedSignature = crypto.createHmac('sha256', appSecret).update(payload).digest('base64');
-  expectedSignature = expectedSignature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');  
+  expectedSignature = expectedSignature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   console.log('!!expectedSignature-->', expectedSignature);
   // if (encodedSignature !== expectedSignature) {
   //   console.log('!!encodedSignature-->', encodedSignature);
@@ -160,7 +160,7 @@ app.post('/auth/facebook', function(req, res, next) {
   //   return res.status(400).send('Invalid Request Signature');
   // }
 
-  User.findOne({ facebook: profile.id }, function(err, existingUser) {    
+  User.findOne({ facebook: profile.id }, function(err, existingUser) {
     if (existingUser) {
       var token = createJwtToken(existingUser);
       return res.send(token);
@@ -235,6 +235,27 @@ app.get('/api/shows/:id', function(req, res, next) {
   });
 });
 
+app.get('/api/search/:search', function(req, res, next) {
+  var searchParam = req.params.search
+    .toLowerCase()
+    .replace(/ /g, '_')
+    .replace(/[^\w-]+/g, '');
+  var parser = xml2js.Parser();
+  request.get('http://thetvdb.com/api/GetSeries.php?seriesname=' + searchParam, function (error, response, body) {
+    setTimeout(function() {
+      if (error) return next(error);
+      parser.parseString(body, function (err, result) {
+        console.log('result' >>> result);
+        if (result.Data.Series !== undefined) {
+          return res.status(200).send(result.Data.Series);
+        } else {
+          res.status(411).send({message: searchParam + " wasn't found"});
+        }
+      });
+    }, 3000)
+  });
+});
+
 app.post('/api/shows', function (req, res, next) {
   var seriesName = req.body.showName
     .toLowerCase()
@@ -252,7 +273,7 @@ app.post('/api/shows', function (req, res, next) {
         if (error) return next(error);
         parser.parseString(body, function (err, result) {
           if (!result.data.series) {
-            return res.status(400).send({ message: req.body.showName + ' was not found.' });
+            return res.status(400).send({ message: req.body.showName + ' was not found' });
           }
           var seriesId = result.data.series.seriesid || result.data.series[0].seriesid;
           callback(err, seriesId);

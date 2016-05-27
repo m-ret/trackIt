@@ -1,16 +1,28 @@
-<div class="container">
+<div class="container add-view">
   <div class="panel panel-default">
-    <div class="panel-heading">Add TV Show</div>
+    <div class="panel-heading">Add TV Show <span ng-show="adding" class="pull-right">Please wait...</span></div>
     <div class="panel-body">
       <form class="form" method="post" ng-submit="addShow()" name="addForm">
         <div class="form-group" ng-class="{ 'has-error' : addForm.showName.$invalid && addForm.showName.$dirty }">
           <label class="control-label">Name</label>
-          <input class="form-control" type="text" name="showName" ng-model="showName" placeholder="Enter TV show name" required autofocus>
+          <input class="form-control" type="text" name="showName" ng-model="showName" ng-model-options="{debounce: 500}"
+                 placeholder="Enter TV show name" required autofocus>
           <div class="help-block text-danger" ng-if="addForm.showName.$dirty" ng-messages="addForm.showName.$error">
             <div ng-message="required">TV show name is required.</div>
           </div>
         </div>
-        <button class="btn btn-primary" type="submit" ng-disabled="addForm.$invalid">Add</button>
+<!--         <button class="btn btn-primary" type="submit" ng-disabled="addForm.$invalid">
+          <span ng-show="!adding">Add</span>
+          <span ng-show="adding">Adding...</span>
+        </button>  -->
+        <div style="margin-top: 10px;">
+          <button ng-repeat="item in responseData"
+              class="label label-default result-btn" ng-click="data.test = item.SeriesName; updateNgModel()"
+              ng-model="showName" value="item.SeriesName"
+              ng-bind="item.SeriesName"
+              type="submit" ng-model="showName">
+          </button>
+        </div>
       </form>
     </div>
   </div>

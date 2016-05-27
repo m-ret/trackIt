@@ -1,6 +1,7 @@
 angular.module('MyApp', ['ngResource', 'ngMessages', 'ngRoute', 'ngAnimate', 'mgcrea.ngStrap'])
-  .config(function ($routeProvider, $locationProvider) {
+  .config(function ($routeProvider, $locationProvider, $httpProvider, $compileProvider) {
     $locationProvider.html5Mode(true);
+    $compileProvider.imgSrcSanitizationWhitelist(/^\s*(https?|local|data|jpeg|image|chrome-extension):/);
 
     $routeProvider
       .when('/', {
