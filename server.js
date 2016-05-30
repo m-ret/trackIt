@@ -51,7 +51,10 @@ var userSchema = new mongoose.Schema({
   password: String,
   facebook: {
     id: String,
-    email: String
+    email: String,
+    picture: String,
+    first_name: String,
+    last_name: String
   },
   google: {
     id: String,
@@ -145,6 +148,7 @@ app.post('/auth/login', function(req, res, next) {
 
 app.post('/auth/facebook', function(req, res, next) {
   var profile = req.body.profile;
+  console.log('___profile___', profile);
   var signedRequest = req.body.signedRequest;
   var encodedSignature = signedRequest.split('.')[0];
   var payload = signedRequest.split('.')[1];
@@ -153,23 +157,21 @@ app.post('/auth/facebook', function(req, res, next) {
 
   var expectedSignature = crypto.createHmac('sha256', appSecret).update(payload).digest('base64');
   expectedSignature = expectedSignature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  console.log('!!expectedSignature-->', expectedSignature);
-  // if (encodedSignature !== expectedSignature) {
-  //   console.log('!!encodedSignature-->', encodedSignature);
-  //   console.log('!!expectedSignature-->', expectedSignature);
-  //   return res.status(400).send('Invalid Request Signature');
-  // }
 
   User.findOne({ facebook: profile.id }, function(err, existingUser) {
     if (existingUser) {
       var token = createJwtToken(existingUser);
       return res.send(token);
     }
+
     var user = new User({
       name: profile.name,
       facebook: {
         id: profile.id,
-        email: profile.email
+        email: profile.email,
+        picture: profile.picture.data.url,
+        first_name: profile.first_name,
+        last_name: profile.last_name
       }
     });
     user.save(function(err) {

@@ -1,217 +1,200 @@
-angular.module('MyApp').factory('Auth', function($http, $location, $rootScope, $alert, $window) {
-  /**
-   * @param {Object} message
-   * @return {undefined}
-   */
-  function onMessage(message) {
-    console.log('statusChangeCallback');
-    console.log(message);
-    if ('connected' === message.status) {
-      getInfo();
-    } else {
-      if ('not_authorized' === message.status) {
-        console.log('Please log into this app.');
+angular.module('MyApp')
+  .factory('Auth', function($http, $location, $rootScope, $q, $alert, $window) {
+    var token = $window.localStorage.token;
+    if (token) {
+      var payload = JSON.parse($window.atob(token.split('.')[1]));
+      $rootScope.currentUser = payload.user;
+    }
+    // This is called with the results from from FB.getLoginStatus().
+    function statusChangeCallback(response) {
+      console.log('statusChangeCallback', response);
+      // The response object is returned with a status field that lets the
+      // app know the current login status of the person.
+      // Full docs on the response object can be found in the documentation
+      // for FB.getLoginStatus().
+      if (response.status === 'connected') {
+        // Logged into your app and Facebook.
+        testAPI();
+      } else if (response.status === 'not_authorized') {
+        // The person is logged into Facebook, but not your app.
+        console.log({'status' : 'Please log into this app.'});
       } else {
-        console.log('Please log into Facebook.');
+        // The person is not logged into Facebook, so we're not sure if
+        // they are logged into this app or not.
+        console.log({'status' : 'Please log into Facebook.'});
       }
-    }
-  }
-  /**
-   * @return {undefined}
-   */
-  function constructor() {
-    FB.getLoginStatus(function(msg) {
-      onMessage(msg);
-    });
-  }
-  /**
-   * @return {undefined}
-   */
-  function getInfo() {
-    console.log('Welcome!  Fetching your information.... ');
-    FB.api('/me', function(unused) {
-      console.log('Successful login for: ' + unused.name);
-      console.log('Thanks for logging in, ' + unused.name + '!');
-    });
-  }
-  var start = $window.localStorage.token;
-  if (start) {
-    /** @type {*} */
-    var data = JSON.parse($window.atob(start.split('.')[1]));
-    $rootScope.currentUser = data.user;
-  }
-  return $window.fbAsyncInit = function() {
-    FB.init({
-      appId : '624059410963642',
-      responseType : 'token',
-      status : true,
-      cookie : true,
-      xfbml : true,
-      version : 'v2.4'
-    });
-    FB.getLoginStatus(function(msg) {
-      onMessage(msg);
-    });
-  }, function(d, el, id) {
-    var element;
-    var insertAt = d.getElementsByTagName(el)[0];
-    if (!d.getElementById(id)) {
-      /** @type {Element} */
-      element = d.createElement(el);
-      /** @type {string} */
-      element.id = id;
-      /** @type {string} */
-      element.src = '//connect.facebook.net/en_US/sdk.js';
-      insertAt.parentNode.insertBefore(element, insertAt);
-    }
-  }(document, 'script', 'facebook-jssdk'), function() {
-    /** @type {Element} */
-    var ga = document.createElement('script');
-    /** @type {string} */
-    ga.type = 'text/javascript';
-    /** @type {boolean} */
-    ga.async = true;
-    /** @type {string} */
-    ga.src = 'https://apis.google.com/js/client:plusone.js';
-    var insertAt = document.getElementsByTagName('script')[0];
-    insertAt.parentNode.insertBefore(ga, insertAt);
-  }(), {
-    /**
-     * @return {undefined}
-     */
-    facebookLogin : function() {
-      FB.login(function(info) {
-        FB.api('/me', function(profile) {
-          /** @type {string} */
-          $rootScope.profile = profile;
-          var user = {
-            signedRequest : info.authResponse.signedRequest,
-            profile : profile
-          };
-          constructor();
-          $http.post('/auth/facebook', user).success(function(token) {
-            /** @type {*} */
-            var data = JSON.parse($window.atob(token.split('.')[1]));
-            /** @type {string} */
-            $window.localStorage.token = token;
-            $rootScope.currentUser = data.user;
-            console.log($rootScope.currentUser);
-            $location.path('/');
-            $alert({
-              title : 'Cheers!',
-              content : 'You have successfully signed-in with Facebook.',
-              animation : 'fadeZoomFadeDown',
-              type : 'material',
-              duration : 3
-            });
-          });
-        });
-      }, {
-        scope : 'email, public_profile'
+    };
+
+    function checkLoginState() {
+      FB.getLoginStatus(function(response) {
+        statusChangeCallback(response);
       });
-    },
-    /**
-     * @return {undefined}
-     */
-    googleLogin : function() {
-      gapi.auth.authorize({
-        client_id : '55262601920-5jhf3qth89okujq6a7lh8bqc9epr8475.apps.googleusercontent.com',
-        scope : 'https://www.googleapis.com/auth/plus.login https://www.googleapis.com/auth/plus.profile.emails.read',
-        immediate : false
-      }, function(dataAndEvents) {
-        gapi.client.load('plus', 'v1', function() {
-          var suiteWithAfter = gapi.client.plus.people.get({
-            userId : 'me'
+    };
+
+    // Asynchronously initialize Facebook SDK
+    $window.fbAsyncInit = function() {
+      FB.init({
+        appId : '624059410963642',
+        responseType : 'token',
+        status : true,
+        cookie : true,
+        xfbml : true,
+        version : 'v2.4'
+      });
+
+      FB.getLoginStatus(function(response) {
+        statusChangeCallback(response);
+      });
+    };
+
+    // Asynchronously load Facebook SDK
+    (function(d, s, id) {
+      var js, fjs = d.getElementsByTagName(s)[0];
+      if (d.getElementById(id)) {
+        return;
+      }
+      js = d.createElement(s);
+      js.id = id;
+      js.src = "//connect.facebook.net/en_US/sdk.js";
+      fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    // Here we run a very simple test of the Graph API after login is
+    // successful.  See statusChangeCallback() for when this call is made.
+    function testAPI() {
+      console.log('Welcome!  Fetching your information.... ');
+      FB.api('/me', function(response) {
+        console.log('Successful login for: ' + response.name);
+        console.log({'status' : 'Thanks for logging in, ' + response.name + '!'});
+      });
+    }
+
+    // Asynchronously load Google+ SDK
+    (function() {
+      var po = document.createElement('script');
+      po.type = 'text/javascript';
+      po.async = true;
+      po.src = 'https://apis.google.com/js/client:plusone.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(po, s);
+    })();
+
+    return {
+      facebookLogin: function() {
+        var deferred = $q.defer();
+        FB.login(function(response) {
+          FB.api('/me', {fields: 'name, first_name, last_name, picture,email'}, function(profile) {
+            deferred.resolve(profile);
+            var data = {
+              signedRequest: response.authResponse.signedRequest,
+              profile: profile
+            };
+            $rootScope.profPic = profile.picture.data.url;
+            // checkLoginState();
+            return $http.post('/auth/facebook', data)
+              .success(function(token) {
+                var payload = JSON.parse($window.atob(token.split('.')[1]));
+                $window.localStorage.token = token;
+                $rootScope.currentUser = payload.user;
+                $location.path('/');
+                $alert({
+                  title: 'Cheers!',
+                  content: 'You have successfully signed-in with Facebook.',
+                  animation: 'fadeZoomFadeDown',
+                  type: 'material',
+                  duration: 3
+                });
+              });
           });
-          suiteWithAfter.execute(function(profile) {
-            $http.post('/auth/google', {
-              profile : profile
-            }).success(function(token) {
-              /** @type {*} */
-              var data = JSON.parse($window.atob(token.split('.')[1]));
-              /** @type {string} */
-              $window.localStorage.token = token;
-              $rootScope.currentUser = data.user;
-              $location.path('/');
-              $alert({
-                title : 'Cheers!',
-                content : 'You have successfully signed-in with Google.',
-                animation : 'fadeZoomFadeDown',
-                type : 'material',
-                duration : 3
+        }, { scope: 'email, public_profile' });
+        return deferred.promise;
+      },
+      googleLogin: function() {
+        gapi.auth.authorize({
+          client_id: '55262601920-5jhf3qth89okujq6a7lh8bqc9epr8475.apps.googleusercontent.com',
+          scope: 'https://www.googleapis.com/auth/plus.login https://www.googleapis.com/auth/plus.profile.emails.read',
+          immediate: false
+        }, function(token) {
+          gapi.client.load('plus', 'v1', function() {
+            var request = gapi.client.plus.people.get({
+              userId: 'me'
+            });
+            request.execute(function(authData) {
+              $http.post('/auth/google', { profile: authData }).success(function(token) {
+                var payload = JSON.parse($window.atob(token.split('.')[1]));
+                $window.localStorage.token = token;
+                $rootScope.currentUser = payload.user;
+                $location.path('/');
+                $alert({
+                  title: 'Cheers!',
+                  content: 'You have successfully signed-in with Google.',
+                  animation: 'fadeZoomFadeDown',
+                  type: 'material',
+                  duration: 3
+                });
               });
             });
           });
         });
-      });
-    },
-    /**
-     * @param {Function} user
-     * @return {?}
-     */
-    login : function(user) {
-      return $http.post('/auth/login', user).success(function(data) {
-        $window.localStorage.token = data.token;
-        /** @type {*} */
-        var results = JSON.parse($window.atob(data.token.split('.')[1]));
-        $rootScope.currentUser = results.user;
-        $location.path('/');
-        $alert({
-          title : 'Cheers!',
-          content : 'You have successfully logged in.',
-          animation : 'fadeZoomFadeDown',
-          type : 'material',
-          duration : 3
-        });
-      }).error(function() {
+      },
+      login: function(user) {
+        return $http.post('/auth/login', user)
+          .success(function(data) {
+            $window.localStorage.token = data.token;
+            var payload = JSON.parse($window.atob(data.token.split('.')[1]));
+            $rootScope.currentUser = payload.user;
+            $location.path('/');
+            $alert({
+              title: 'Cheers!',
+              content: 'You have successfully logged in',
+              animation: 'fadeZoomFadeDown',
+              type: 'material',
+              duration: 3
+            });
+          })
+          .error(function() {
+            delete $window.localStorage.token;
+            $alert({
+              title: 'Error!',
+              content: 'Invalid username or password.',
+              animation: 'fadeZoomFadeDown',
+              type: 'material',
+              duration: 3
+            });
+          });
+      },
+      signup: function(user) {
+        return $http.post('/auth/signup', user)
+          .success(function() {
+            $location.path('/login');
+            $alert({
+              title: 'Congratulations!',
+              content: 'Your account has been created.',
+              animation: 'fadeZoomFadeDown',
+              type: 'material',
+              duration: 3
+            });
+          })
+          .error(function(response) {
+            $alert({
+              title: 'Error!',
+              content: response.data,
+              animation: 'fadeZoomFadeDown',
+              type: 'material',
+              duration: 3
+            });
+          });
+      },
+      logout: function() {
         delete $window.localStorage.token;
-        $alert({
-          title : 'Error!',
-          content : 'Invalid username or password.',
-          animation : 'fadeZoomFadeDown',
-          type : 'material',
-          duration : 3
-        });
-      });
-    },
-    /**
-     * @param {?} data
-     * @return {?}
-     */
-    signup : function(data) {
-      return $http.post('/auth/signup', data).success(function() {
+        $rootScope.currentUser = null;
         $location.path('/login');
         $alert({
-          title : 'Congratulations!',
-          content : 'Your account has been created.',
-          animation : 'fadeZoomFadeDown',
-          type : 'material',
-          duration : 3
+          content: 'You have been logged out.',
+          animation: 'fadeZoomFadeDown',
+          type: 'material',
+          duration: 3
         });
-      }).error(function(event) {
-        $alert({
-          title : 'Error!',
-          content : event.data,
-          animation : 'fadeZoomFadeDown',
-          type : 'material',
-          duration : 3
-        });
-      });
-    },
-    /**
-     * @return {undefined}
-     */
-    logout : function() {
-      delete $window.localStorage.token;
-      /** @type {null} */
-      $rootScope.currentUser = null;
-      $alert({
-        content : 'You have been logged out.',
-        animation : 'fadeZoomFadeDown',
-        type : 'material',
-        duration : 3
-      });
-      $location.path('/login');
-    }
-  };
-});
+      }
+    };
+  });
